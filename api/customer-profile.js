@@ -16,10 +16,10 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === "POST") {
-    const { name, email, address, profile_photo_url } = req.body || {};
+    const { name, email, address, mobile, profile_photo_url } = req.body || {};
     const { data, error } = await supabaseAdmin
       .from("customers")
-      .update({ name, email, address, profile_photo_url, updated_at: new Date().toISOString() })
+      .update({ name, email, address, mobile, profile_photo_url, updated_at: new Date().toISOString() })
       .eq("id", session.customerId)
       .select()
       .single();

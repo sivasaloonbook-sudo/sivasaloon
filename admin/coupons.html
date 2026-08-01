@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Coupons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Coupons &amp; Offers</span>
+    <h2 class="mt-24">Coupon Management</h2>
+
+    <form id="add-coupon-form" class="panel mt-24 grid grid-3">
+      <div class="field" style="margin:0;">
+        <label for="c-code">Code</label>
+        <input type="text" id="c-code" placeholder="SIVA10" required style="text-transform: uppercase;" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-type">Discount Type</label>
+        <select id="c-type">
+          <option value="percent">Percent (%)</option>
+          <option value="flat">Flat (₹)</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-value">Discount Value</label>
+        <input type="number" id="c-value" min="0" step="0.01" required />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-max">Max Discount (₹, optional)</label>
+        <input type="number" id="c-max" min="0" step="0.01" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-from">Valid From</label>
+        <input type="date" id="c-from" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-to">Valid To</label>
+        <input type="date" id="c-to" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="c-limit">Usage Limit (optional)</label>
+        <input type="number" id="c-limit" min="1" />
+      </div>
+      <div style="align-self:end;">
+        <button type="submit" class="btn btn-primary btn-block">Create Coupon</button>
+      </div>
+    </form>
+
+    <div id="coupon-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const list = document.getElementById("coupon-list");
+
+  async function loadCoupons() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const res = await fetch("/api/admin/coupons");
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load coupons.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    if (!data.coupons.length) {
+      list.innerHTML = `<div class="build-stub">No coupons yet — create one above.</div>`;
+      return;
+    }
+    data.coupons.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;";
+      const discount = c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value}`;
+      row.innerHTML = `
+        <div>
+          <div style="font-family: var(--font-mono); font-weight:600;">${c.code}</div>
+          <div style="font-size:0.8rem; color: var(--paper-dim); margin-top:2px;">
+            ${discount} off ${c.max_discount ? `(max ₹${c.max_discount})` : ""} · used ${c.times_used}${c.usage_limit ? "/" + c.usage_limit : ""}
+            ${c.valid_from || c.valid_to ? `· ${c.valid_from || "…"} to ${c.valid_to || "…"}` : ""}
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span class="badge ${c.is_active ? "confirmed" : "cancelled"}">${c.is_active ? "active" : "inactive"}</span>
+          <button class="btn btn-outline" data-toggle="${c.id}" data-active="${c.is_active}" style="padding:8px 14px; font-size:0.78rem;">
+            ${c.is_active ? "Deactivate" : "Activate"}
+          </button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll("[data-toggle]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const isActive = btn.dataset.active === "true";
+        const res = await fetch("/api/admin/coupons", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ couponId: btn.dataset.toggle, is_active: !isActive }),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Could not update coupon.");
+        loadCoupons();
+      });
+    });
+  }
+
+  document.getElementById("add-coupon-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      code: document.getElementById("c-code").value.trim().toUpperCase(),
+      discount_type: document.getElementById("c-type").value,
+      discount_value: Number(document.getElementById("c-value").value),
+      max_discount: document.getElementById("c-max").value ? Number(document.getElementById("c-max").value) : null,
+      valid_from: document.getElementById("c-from").value || null,
+      valid_to: document.getElementById("c-to").value || null,
+      usage_limit: document.getElementById("c-limit").value ? Number(document.getElementById("c-limit").value) : null,
+    };
+    const res = await fetch("/api/admin/coupons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Could not create coupon.");
+    document.getElementById("add-coupon-form").reset();
+    loadCoupons();
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadCoupons();
+</script>
+
+</body>
+</html>

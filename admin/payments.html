@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Billing &amp; Payments</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  @media print {
+    .site-header, .top-nav, .site-footer, .stripe-divider, #payments-list, h2, .eyebrow, #verify-dialog-backdrop { display: none !important; }
+    #invoice-print { display: block !important; }
+  }
+  #invoice-print { display: none; }
+</style>
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Billing &amp; Payments</span>
+    <h2 class="mt-24">Invoices</h2>
+    <p style="max-width: 560px;">Every confirmed booking has a bill. Print or verify payment against it here.</p>
+
+    <div id="payments-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+
+  <!-- Printable invoice, hidden until "Print" is clicked -->
+  <div id="invoice-print" style="max-width: 480px; margin: 0 auto; color: #111; background: #fff; padding: 30px;">
+    <h2 id="inv-title" style="color:#111;">Siva Saloon — Invoice</h2>
+    <p id="inv-number" style="color:#333;"></p>
+    <hr />
+    <p id="inv-customer" style="color:#333;"></p>
+    <p id="inv-service" style="color:#333;"></p>
+    <p id="inv-total" style="color:#111; font-weight:700;"></p>
+  </div>
+</div>
+
+<script>
+  const list = document.getElementById("payments-list");
+
+  function fmtDate(d) {
+    return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  async function loadBookings() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const res = await fetch("/api/admin/bookings");
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load bookings.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    const withBills = data.bookings.filter((b) => b.bills?.length);
+    if (!withBills.length) {
+      list.innerHTML = `<div class="build-stub">No invoices yet.</div>`;
+      return;
+    }
+    withBills.forEach((b) => {
+      const bill = b.bills[0];
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;";
+      row.innerHTML = `
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.9rem;">${bill.invoice_number}</div>
+          <div style="font-size:0.85rem; margin-top:2px;">${b.customers?.name || "—"} · ${b.customers?.mobile || "—"}</div>
+          <div style="font-size:0.8rem; color: var(--paper-dim); margin-top:2px;">${fmtDate(b.booking_date)} · ${b.services?.name || "Service"} · ₹${bill.total}</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+          <span class="badge ${bill.payment_status}">${bill.payment_status}</span>
+          <button class="btn btn-outline" data-print='${JSON.stringify({ inv: bill.invoice_number, cust: b.customers?.name, mobile: b.customers?.mobile, service: b.services?.name, total: bill.total }).replace(/'/g, "&apos;")}' style="padding:8px 14px; font-size:0.78rem;">Print</button>
+          ${bill.payment_status !== "paid" ? `<button class="btn btn-primary" data-verify="${b.id}" data-amount="${bill.total}" style="padding:8px 14px; font-size:0.78rem;">Verify Payment</button>` : ""}
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll("[data-print]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const info = JSON.parse(btn.dataset.print);
+        document.getElementById("inv-number").textContent = `Invoice: ${info.inv}`;
+        document.getElementById("inv-customer").textContent = `Customer: ${info.cust || "—"} (${info.mobile || "—"})`;
+        document.getElementById("inv-service").textContent = `Service: ${info.service || "—"}`;
+        document.getElementById("inv-total").textContent = `Total: ₹${info.total}`;
+        window.print();
+      });
+    });
+
+    list.querySelectorAll("[data-verify]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const method = prompt("Payment method (cash / upi / card / qr):", "cash");
+        if (!method) return;
+        const res = await fetch("/api/admin/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId: btn.dataset.verify, amount: Number(btn.dataset.amount), method }),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Could not verify payment.");
+        loadBookings();
+      });
+    });
+  }
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadBookings();
+</script>
+
+</body>
+</html>

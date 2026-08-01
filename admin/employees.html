@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Employees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Employees</span>
+    <h2 class="mt-24">Employee Management</h2>
+    <p style="max-width: 560px;">Each active employee adds one slot column across every open time window — no other setup needed to increase capacity.</p>
+
+    <form id="add-employee-form" class="panel mt-24" style="display:flex; gap:16px; align-items:flex-end; flex-wrap: wrap;">
+      <div class="field" style="margin:0; flex:1; min-width: 180px;">
+        <label for="emp-name">Name</label>
+        <input type="text" id="emp-name" required />
+      </div>
+      <div class="field" style="margin:0; flex:1; min-width: 180px;">
+        <label for="emp-mobile">Mobile (optional)</label>
+        <input type="tel" id="emp-mobile" />
+      </div>
+      <button type="submit" class="btn btn-primary">Add Employee</button>
+    </form>
+
+    <div id="employee-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const list = document.getElementById("employee-list");
+
+  async function loadEmployees() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const res = await fetch("/api/admin/employees");
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load employees.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    if (!data.employees.length) {
+      list.innerHTML = `<div class="build-stub">No employees yet — add the first one above.</div>`;
+      return;
+    }
+    data.employees.forEach((emp) => {
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center;";
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:600;">${emp.name}</div>
+          ${emp.mobile ? `<div style="font-size:0.8rem; color: var(--paper-dim); margin-top:2px;">${emp.mobile}</div>` : ""}
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span class="badge ${emp.is_active ? "confirmed" : "cancelled"}">${emp.is_active ? "active" : "inactive"}</span>
+          <button class="btn btn-outline" data-toggle="${emp.id}" data-active="${emp.is_active}" style="padding:8px 14px; font-size:0.78rem;">
+            ${emp.is_active ? "Deactivate" : "Activate"}
+          </button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll("[data-toggle]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const isActive = btn.dataset.active === "true";
+        const res = await fetch("/api/admin/employees", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: btn.dataset.toggle, is_active: !isActive }),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Could not update employee.");
+        loadEmployees();
+      });
+    });
+  }
+
+  document.getElementById("add-employee-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("emp-name").value.trim();
+    const mobile = document.getElementById("emp-mobile").value.trim();
+    const res = await fetch("/api/admin/employees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mobile }),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Could not add employee.");
+    document.getElementById("add-employee-form").reset();
+    loadEmployees();
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadEmployees();
+</script>
+
+</body>
+</html>

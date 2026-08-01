@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Bookings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Bookings</span>
+    <h2 class="mt-24">Booking Management</h2>
+
+    <div class="panel mt-24" style="display:flex; gap:16px; flex-wrap: wrap; align-items:flex-end;">
+      <div class="field" style="margin:0;">
+        <label for="filter-date">Date</label>
+        <input type="date" id="filter-date" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label for="filter-status">Status</label>
+        <select id="filter-status">
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <button class="btn btn-outline" id="apply-filters">Apply</button>
+      <button class="btn btn-outline" id="clear-filters">Clear</button>
+    </div>
+
+    <div id="bookings-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const list = document.getElementById("bookings-list");
+
+  function fmtDate(d) {
+    return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  async function loadBookings() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const date = document.getElementById("filter-date").value;
+    const status = document.getElementById("filter-status").value;
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    if (status) params.set("status", status);
+
+    const res = await fetch(`/api/admin/bookings?${params.toString()}`);
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load bookings.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    if (!data.bookings.length) {
+      list.innerHTML = `<div class="build-stub">No bookings match these filters.</div>`;
+      return;
+    }
+    data.bookings.forEach((b) => {
+      const payStatus = b.bills?.[0]?.payment_status || "unpaid";
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 12px;";
+      row.innerHTML = `
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.9rem;">${fmtDate(b.booking_date)} · ${b.start_time}</div>
+          <div style="font-size: 0.85rem; margin-top: 4px;">${b.customers?.name || "—"} · ${b.customers?.mobile || "—"}</div>
+          <div style="font-size: 0.8rem; color: var(--paper-dim); margin-top: 2px;">${b.services?.name || "Service"} with ${b.employees?.name || "—"} · ₹${b.final_amount ?? b.services?.price ?? "—"}</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+          <span class="badge ${b.status}">${b.status}</span>
+          <span class="badge ${payStatus}">${payStatus}</span>
+          ${b.status !== "completed" && b.status !== "cancelled" ? `<button class="btn btn-outline" data-complete="${b.id}" style="padding:8px 14px; font-size:0.78rem;">Mark Completed</button>` : ""}
+          ${b.status !== "cancelled" ? `<button class="btn btn-outline" data-cancel="${b.id}" style="padding:8px 14px; font-size:0.78rem;">Cancel</button>` : ""}
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll("[data-complete]").forEach((btn) =>
+      btn.addEventListener("click", () => updateStatus(btn.dataset.complete, "completed"))
+    );
+    list.querySelectorAll("[data-cancel]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        if (confirm("Cancel this booking?")) updateStatus(btn.dataset.cancel, "cancelled");
+      })
+    );
+  }
+
+  async function updateStatus(bookingId, status) {
+    const res = await fetch("/api/admin/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId, status }),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Could not update booking.");
+    loadBookings();
+  }
+
+  document.getElementById("apply-filters").addEventListener("click", loadBookings);
+  document.getElementById("clear-filters").addEventListener("click", () => {
+    document.getElementById("filter-date").value = "";
+    document.getElementById("filter-status").value = "";
+    loadBookings();
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadBookings();
+</script>
+
+</body>
+</html>

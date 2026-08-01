@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Customers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Customers</span>
+    <h2 class="mt-24">Customer Management</h2>
+
+    <div class="panel mt-24" style="display:flex; gap:16px; align-items:flex-end;">
+      <div class="field" style="margin:0; flex:1;">
+        <label for="search">Search</label>
+        <input type="text" id="search" placeholder="Name, mobile, or email" />
+      </div>
+      <button class="btn btn-outline" id="search-btn">Search</button>
+    </div>
+
+    <div id="customer-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const list = document.getElementById("customer-list");
+
+  async function loadCustomers() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const search = document.getElementById("search").value.trim();
+    const params = search ? `?search=${encodeURIComponent(search)}` : "";
+    const res = await fetch(`/api/admin/customers${params}`);
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load customers.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    if (!data.customers.length) {
+      list.innerHTML = `<div class="build-stub">No customers found.</div>`;
+      return;
+    }
+    data.customers.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;";
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:600;">${c.name || "Unnamed customer"}</div>
+          <div style="font-size:0.85rem; color: var(--paper-dim); margin-top: 2px;">${c.mobile} ${c.email ? "· " + c.email : ""}</div>
+          ${c.address ? `<div style="font-size:0.8rem; color: var(--paper-dim); margin-top: 2px;">${c.address}</div>` : ""}
+        </div>
+        <span class="badge ${c.otp_verified ? "confirmed" : "pending"}">${c.otp_verified ? "verified" : "unverified"}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById("search-btn").addEventListener("click", loadCustomers);
+  document.getElementById("search").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadCustomers();
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadCustomers();
+</script>
+
+</body>
+</html>

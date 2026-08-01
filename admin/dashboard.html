@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Today at a Glance</span>
+    <h2 class="mt-24">Overview</h2>
+
+    <div class="grid grid-3 mt-24">
+      <div class="panel">
+        <span class="eyebrow">Today's Bookings</span>
+        <h1 class="mt-24" style="font-size: 2.6rem;" id="stat-bookings">—</h1>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Revenue Today</span>
+        <h1 class="mt-24" style="font-size: 2.6rem;" id="stat-revenue">₹—</h1>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Pending Payments</span>
+        <h1 class="mt-24" style="font-size: 2.6rem;" id="stat-pending">—</h1>
+      </div>
+    </div>
+
+    <div class="stripe-divider mt-40"></div>
+
+    <div class="grid grid-2 mt-40">
+      <a href="bookings.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Bookings</span>
+        <h3 class="mt-24">Booking Management</h3>
+        <p>All bookings — filter by date/status, confirm, cancel.</p>
+      </a>
+      <a href="customers.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Customers</span>
+        <h3 class="mt-24">Customer Management</h3>
+        <p>Search customers, view contact details and history.</p>
+      </a>
+      <a href="employees.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Employees</span>
+        <h3 class="mt-24">Employee Management</h3>
+        <p>Add/deactivate staff — each active employee adds one slot column per time window.</p>
+      </a>
+      <a href="payments.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Billing</span>
+        <h3 class="mt-24">Billing &amp; Payments</h3>
+        <p>View invoices, print/download, verify incoming payments.</p>
+      </a>
+      <a href="coupons.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Coupons &amp; Offers</span>
+        <h3 class="mt-24">Coupon Management</h3>
+        <p>Create and toggle coupon codes and offer windows.</p>
+      </a>
+      <a href="reports.html" class="panel" style="text-decoration:none; color: inherit;">
+        <span class="eyebrow">Reports</span>
+        <h3 class="mt-24">Revenue Analytics</h3>
+        <p>Daily/weekly/monthly revenue and booking trends.</p>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  async function loadStats() {
+    const res = await fetch("/api/admin/stats");
+    if (res.status === 401) {
+      window.location.href = "index.html";
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) return;
+    document.getElementById("stat-bookings").textContent = data.todaysBookings;
+    document.getElementById("stat-revenue").textContent = `₹${data.revenueToday}`;
+    document.getElementById("stat-pending").textContent = data.pendingPayments;
+  }
+  loadStats();
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+</script>
+
+</body>
+</html>

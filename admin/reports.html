@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Reports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Reports</span>
+    <h2 class="mt-24">Revenue Analytics</h2>
+
+    <div style="display:flex; gap:10px; margin: 20px 0;">
+      <button class="btn btn-outline" data-range="7d">7 Days</button>
+      <button class="btn btn-outline" data-range="30d">30 Days</button>
+      <button class="btn btn-outline" data-range="90d">90 Days</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="panel">
+        <span class="eyebrow">Total Revenue</span>
+        <h1 class="mt-24" style="font-size: 2.4rem;" id="total-revenue">₹—</h1>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Total Bookings</span>
+        <h1 class="mt-24" style="font-size: 2.4rem;" id="total-bookings">—</h1>
+      </div>
+    </div>
+
+    <div class="panel mt-24">
+      <span class="eyebrow">Revenue by Day</span>
+      <div id="chart" class="mt-24" style="display:flex; align-items:flex-end; gap:6px; height:220px; overflow-x:auto;"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  async function loadReport(range) {
+    const res = await fetch(`/api/admin/reports?range=${range}`);
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) return;
+
+    document.getElementById("total-revenue").textContent = `₹${data.totalRevenue}`;
+    document.getElementById("total-bookings").textContent = data.totalBookings;
+
+    const chart = document.getElementById("chart");
+    chart.innerHTML = "";
+    const max = Math.max(1, ...data.series.map((d) => d.revenue));
+    data.series.forEach((d) => {
+      const barWrap = document.createElement("div");
+      barWrap.style = "display:flex; flex-direction:column; align-items:center; gap:6px; min-width: 34px;";
+      const bar = document.createElement("div");
+      const heightPct = Math.max(4, Math.round((d.revenue / max) * 170));
+      bar.style = `width: 22px; height: ${heightPct}px; background: linear-gradient(180deg, var(--brass-bright), var(--brass)); border-radius: 3px 3px 0 0;`;
+      bar.title = `₹${d.revenue} · ${d.bookings} bookings`;
+      const label = document.createElement("div");
+      label.textContent = new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      label.style = "font-family: var(--font-mono); font-size: 0.62rem; color: var(--paper-dim); writing-mode: vertical-rl; transform: rotate(180deg);";
+      barWrap.appendChild(bar);
+      barWrap.appendChild(label);
+      chart.appendChild(barWrap);
+    });
+    if (!data.series.length) {
+      chart.innerHTML = `<div class="build-stub" style="width:100%;">No revenue in this window yet.</div>`;
+    }
+  }
+
+  document.querySelectorAll("[data-range]").forEach((btn) => {
+    btn.addEventListener("click", () => loadReport(btn.dataset.range));
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadReport("7d");
+</script>
+
+</body>
+</html>

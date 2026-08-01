@@ -393,7 +393,23 @@ nav.top-nav a:hover { color: var(--brass-bright); }
 
 @media (max-width: 720px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  nav.top-nav { display: none; }
+
+  .site-header {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  nav.top-nav {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 10px 18px;
+    font-size: 0.72rem;
+  }
+
+  nav.top-nav a {
+    flex: 0 0 auto;
+  }
 }
 
 /* Respect reduced motion */

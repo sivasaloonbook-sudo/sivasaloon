@@ -39,6 +39,10 @@
         <input type="email" id="email" name="email" />
       </div>
       <div class="field">
+        <label for="mobile">Mobile Number (optional, so we can reach you about your booking)</label>
+        <input type="tel" id="mobile" name="mobile" maxlength="10" />
+      </div>
+      <div class="field">
         <label for="address">Address</label>
         <textarea id="address" name="address" rows="3"></textarea>
       </div>
@@ -66,6 +70,7 @@
     document.getElementById("name").value = c.name || "";
     document.getElementById("email").value = c.email || "";
     document.getElementById("address").value = c.address || "";
+    document.getElementById("mobile").value = c.mobile || "";
   }
 
   document.getElementById("profile-form").addEventListener("submit", async (e) => {
@@ -78,6 +83,7 @@
       name: document.getElementById("name").value.trim(),
       email: document.getElementById("email").value.trim(),
       address: document.getElementById("address").value.trim(),
+      mobile: document.getElementById("mobile").value.trim() || null,
     };
     const res = await fetch("/api/customer-profile", {
       method: "POST",

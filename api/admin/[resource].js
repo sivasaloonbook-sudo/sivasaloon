@@ -31,6 +31,8 @@ module.exports = async (req, res) => {
         return await handleVerifyPayment(req, res, admin);
       case "reports":
         return await handleReports(req, res);
+      case "services":
+        return await handleServices(req, res);
       default:
         return res.status(404).json({ error: "Unknown admin resource." });
     }
@@ -273,4 +275,48 @@ async function handleReports(req, res) {
   const totalBookings = series.reduce((sum, d) => sum + d.bookings, 0);
 
   return res.status(200).json({ range, series, totalRevenue, totalBookings });
+}
+
+// ---------------- services ----------------
+async function handleServices(req, res) {
+  if (req.method === "GET") {
+    const { data, error } = await supabaseAdmin.from("services").select("*").order("price", { ascending: true });
+    if (error) return res.status(500).json({ error: "Could not load services." });
+    return res.status(200).json({ services: data });
+  }
+
+  if (req.method === "POST") {
+    const { name, duration_minutes, price } = req.body || {};
+    if (!name || !price) return res.status(400).json({ error: "name and price are required." });
+
+    const { data, error } = await supabaseAdmin
+      .from("services")
+      .insert({ name, duration_minutes: duration_minutes || 20, price })
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: "Could not add service." });
+    return res.status(200).json({ ok: true, service: data });
+  }
+
+  if (req.method === "PATCH") {
+    const { serviceId, is_active, name, duration_minutes, price } = req.body || {};
+    if (!serviceId) return res.status(400).json({ error: "serviceId is required." });
+
+    const updates = {};
+    if (typeof is_active === "boolean") updates.is_active = is_active;
+    if (name !== undefined) updates.name = name;
+    if (duration_minutes !== undefined) updates.duration_minutes = duration_minutes;
+    if (price !== undefined) updates.price = price;
+
+    const { data, error } = await supabaseAdmin
+      .from("services")
+      .update(updates)
+      .eq("id", serviceId)
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: "Could not update service." });
+    return res.status(200).json({ ok: true, service: data });
+  }
+
+  return res.status(405).json({ error: "Method not allowed" });
 }

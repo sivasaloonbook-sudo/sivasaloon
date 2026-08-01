@@ -21,25 +21,25 @@
       </div>
 
       <div class="panel">
-        <!-- Step 1: mobile number -->
-        <form id="mobile-form">
-          <div class="field">
-            <label for="mobile">Mobile Number</label>
-            <input type="tel" id="mobile" name="mobile" placeholder="10-digit mobile number" maxlength="10" required />
-            <div class="hint">We'll send a one-time code via SMS (MSG91).</div>
-          </div>
-          <button type="submit" class="btn btn-primary btn-block">Send OTP</button>
-        </form>
+        <p style="margin-bottom: 22px;">Sign in with your Google account to book a slot.</p>
 
-        <!-- Step 2: OTP entry (hidden until mobile is submitted) -->
-        <form id="otp-form" style="display: none;">
-          <div class="field">
-            <label for="otp">Enter OTP</label>
-            <input type="text" id="otp" name="otp" placeholder="6-digit code" maxlength="6" required />
-            <div class="hint">Sent to <span id="otp-mobile-display"></span> · <a href="#" id="resend-otp">Resend code</a></div>
-          </div>
-          <button type="submit" class="btn btn-primary btn-block">Verify &amp; Continue</button>
-        </form>
+        <!-- Google's own button renders here -->
+        <div id="g_id_onload"
+             data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+             data-callback="handleGoogleLogin"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="filled_black"
+             data-text="signin_with"
+             data-size="large"
+             data-width="320"
+             style="display: flex; justify-content: center;">
+        </div>
+
+        <p id="login-error" style="color: var(--rust); margin-top: 16px; display: none;"></p>
       </div>
 
       <p class="mt-24" style="font-size: 0.85rem;">
@@ -51,87 +51,27 @@
   <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
 </div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-  // ------------------------------------------------------------
-  // OTP flow wiring — MSG91 call happens server-side (Vercel
-  // serverless function) so the auth key never reaches the browser.
-  // This client just posts to those endpoints.
-  // ------------------------------------------------------------
-  const mobileForm = document.getElementById("mobile-form");
-  const otpForm = document.getElementById("otp-form");
-  const otpMobileDisplay = document.getElementById("otp-mobile-display");
-  let pendingMobile = "";
-
-  function setBusy(form, busy) {
-    form.querySelector("button[type=submit]").disabled = busy;
-  }
-
-  mobileForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const mobile = document.getElementById("mobile").value.trim();
-    if (!/^\d{10}$/.test(mobile)) {
-      alert("Enter a valid 10-digit mobile number.");
-      return;
-    }
-    pendingMobile = mobile;
-    setBusy(mobileForm, true);
+  async function handleGoogleLogin(response) {
+    const errorEl = document.getElementById("login-error");
+    errorEl.style.display = "none";
 
     try {
-      const res = await fetch("/api/send-otp", {
+      const res = await fetch("/api/google-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile }),
+        body: JSON.stringify({ credential: response.credential }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not send OTP.");
-
-      otpMobileDisplay.textContent = mobile;
-      mobileForm.style.display = "none";
-      otpForm.style.display = "block";
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(mobileForm, false);
-    }
-  });
-
-  otpForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const otp = document.getElementById("otp").value.trim();
-    setBusy(otpForm, true);
-
-    try {
-      const res = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile: pendingMobile, otp }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Invalid OTP.");
+      if (!res.ok) throw new Error(data.error || "Sign-in failed.");
 
       window.location.href = "dashboard.html";
     } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(otpForm, false);
+      errorEl.textContent = err.message;
+      errorEl.style.display = "block";
     }
-  });
-
-  document.getElementById("resend-otp").addEventListener("click", async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile: pendingMobile }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not resend OTP.");
-      alert("OTP resent to " + pendingMobile);
-    } catch (err) {
-      alert(err.message);
-    }
-  });
+  }
 </script>
 
 </body>

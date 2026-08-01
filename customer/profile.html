@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — My Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Customer Portal</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Book</a>
+      <a href="profile.html">Profile</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px; max-width: 560px;">
+    <span class="eyebrow">Your Details</span>
+    <h2 class="mt-24">Profile</h2>
+
+    <form id="profile-form" class="panel mt-24">
+      <div class="field">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" />
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" />
+      </div>
+      <div class="field">
+        <label for="address">Address</label>
+        <textarea id="address" name="address" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label for="photo">Profile Photo</label>
+        <input type="file" id="photo" name="photo" accept="image/*" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+    </form>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  async function loadProfile() {
+    const res = await fetch("/api/customer-profile");
+    if (res.status === 401) {
+      window.location.href = "index.html";
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) return;
+    const c = data.customer;
+    document.getElementById("name").value = c.name || "";
+    document.getElementById("email").value = c.email || "";
+    document.getElementById("address").value = c.address || "";
+  }
+
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // Note: photo upload to Supabase Storage is a separate step — this
+    // saves the text fields; wire the file input to a storage bucket
+    // upload and pass the resulting public URL as profile_photo_url
+    // once you've created that bucket.
+    const body = {
+      name: document.getElementById("name").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      address: document.getElementById("address").value.trim(),
+    };
+    const res = await fetch("/api/customer-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Could not save profile.");
+    alert("Profile saved.");
+  });
+
+  loadProfile();
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "../index.html";
+  });
+</script>
+
+</body>
+</html>

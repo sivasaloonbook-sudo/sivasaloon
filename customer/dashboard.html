@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — My Bookings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Customer Portal</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Book</a>
+      <a href="profile.html">Profile</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Book a Slot</span>
+    <h2 class="mt-24">Today's Open Chairs</h2>
+    <p style="max-width: 520px;">Pick any open slot below. Booked slots are greyed out and can't be taken.</p>
+
+    <div id="slot-list" class="grid grid-2 mt-24"></div>
+
+    <div id="coupon-panel" class="panel mt-40" style="max-width: 460px;">
+      <span class="eyebrow">Have a Coupon?</span>
+      <div class="field mt-24">
+        <label for="coupon">Coupon Code</label>
+        <input type="text" id="coupon" placeholder="e.g. SIVA10" />
+      </div>
+      <div style="display:flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.85rem; margin-top: 18px;">
+        <span style="color: var(--paper-dim);">Final amount</span>
+        <span id="final-amount" style="color: var(--brass-bright);">₹150</span>
+      </div>
+      <button class="btn btn-primary btn-block mt-24" id="confirm-booking">Confirm Booking</button>
+    </div>
+
+    <div class="stripe-divider mt-40"></div>
+
+    <div class="mt-40">
+      <span class="eyebrow">Booking History</span>
+      <h2 class="mt-24">Your Appointments</h2>
+      <div id="history-list" class="grid mt-24"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const slotList = document.getElementById("slot-list");
+  const historyList = document.getElementById("history-list");
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let selectedSlot = null;
+  let defaultServiceId = null;
+
+  function fmtDate(d) {
+    return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  async function loadServices() {
+    const res = await fetch("/api/services");
+    const data = await res.json();
+    if (res.ok && data.services?.length) defaultServiceId = data.services[0].id;
+  }
+
+  async function loadSlots() {
+    slotList.innerHTML = `<p>Loading slots…</p>`;
+    const res = await fetch(`/api/slots?date=${todayStr}`);
+    const data = await res.json();
+    if (!res.ok) {
+      slotList.innerHTML = `<p>Could not load slots.</p>`;
+      return;
+    }
+    slotList.innerHTML = "";
+    if (!data.slots.length) {
+      slotList.innerHTML = `<div class="build-stub">No employees set up yet — add one in the admin portal to open slots.</div>`;
+      return;
+    }
+    data.slots.forEach((slot) => {
+      const el = document.createElement("div");
+      el.className = "ticket-stub" + (slot.booked ? " booked" : "");
+      el.innerHTML = `
+        <div class="slot-time">
+          <div class="time">${slot.start} – ${slot.end}</div>
+          <div class="with">${slot.employeeName} · Haircut</div>
+        </div>
+        <div class="slot-perf"></div>
+        <button class="slot-action" ${slot.booked ? "disabled" : ""}>
+          ${slot.booked ? "Taken" : "Select"}
+        </button>
+      `;
+      if (!slot.booked) {
+        el.querySelector(".slot-action").addEventListener("click", () => {
+          document.querySelectorAll(".ticket-stub").forEach((s) => s.classList.remove("selected"));
+          el.classList.add("selected");
+          selectedSlot = slot;
+        });
+      }
+      slotList.appendChild(el);
+    });
+  }
+
+  async function loadHistory() {
+    historyList.innerHTML = `<p>Loading…</p>`;
+    const res = await fetch("/api/my-bookings");
+    if (res.status === 401) {
+      window.location.href = "index.html";
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      historyList.innerHTML = `<p>Could not load booking history.</p>`;
+      return;
+    }
+    historyList.innerHTML = "";
+    if (!data.bookings.length) {
+      historyList.innerHTML = `<div class="build-stub">No bookings yet — pick a slot above.</div>`;
+      return;
+    }
+    data.bookings.forEach((b) => {
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;";
+      const payStatus = b.bills?.[0]?.payment_status || "unpaid";
+      row.innerHTML = `
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.9rem;">${fmtDate(b.booking_date)} · ${b.start_time}</div>
+          <div style="font-size: 0.8rem; color: var(--paper-dim);">${b.services?.name || "Service"} with ${b.employees?.name || "—"}</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="badge ${b.status}">${b.status}</span>
+          <span class="badge ${payStatus}">${payStatus}</span>
+          ${b.status === "confirmed" ? `<button class="btn btn-outline" data-cancel="${b.id}" style="padding:8px 14px; font-size:0.78rem;">Cancel</button>` : ""}
+        </div>
+      `;
+      historyList.appendChild(row);
+    });
+
+    historyList.querySelectorAll("[data-cancel]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Cancel this booking?")) return;
+        const res = await fetch("/api/cancel-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId: btn.dataset.cancel }),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Could not cancel.");
+        loadHistory();
+        loadSlots();
+      });
+    });
+  }
+
+  document.getElementById("confirm-booking").addEventListener("click", async () => {
+    if (!selectedSlot) return alert("Pick a slot first.");
+    if (!defaultServiceId) return alert("No service configured yet — add one in the admin portal.");
+
+    const couponCode = document.getElementById("coupon").value.trim() || null;
+
+    try {
+      const res = await fetch("/api/create-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: selectedSlot.employeeId,
+          serviceId: defaultServiceId,
+          date: todayStr,
+          startTime: selectedSlot.start,
+          endTime: selectedSlot.end,
+          couponCode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not confirm booking.");
+
+      alert("Booking confirmed! You'll get a Telegram update from the salon.");
+      selectedSlot = null;
+      document.getElementById("coupon").value = "";
+      loadSlots();
+      loadHistory();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  loadServices();
+  loadSlots();
+  loadHistory();
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "../index.html";
+  });
+</script>
+
+</body>
+</html>

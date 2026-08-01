@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Siva Saloon — Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="page-shell">
+  <header class="container site-header">
+    <div class="brand">
+      <img src="../assets/logo.png" alt="Siva Saloon logo" />
+      <div class="brand-name">Siva Saloon<span>Admin Dashboard</span></div>
+    </div>
+    <nav class="top-nav">
+      <a href="dashboard.html">Overview</a>
+      <a href="bookings.html">Bookings</a>
+      <a href="customers.html">Customers</a>
+      <a href="employees.html">Employees</a>
+      <a href="services.html">Services</a>
+      <a href="coupons.html">Coupons</a>
+      <a href="payments.html">Payments</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="signout-link">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="stripe-divider thin"></div>
+
+  <main class="container" style="padding: 40px 24px 64px;">
+    <span class="eyebrow">Services</span>
+    <h2 class="mt-24">Service Management</h2>
+    <p style="max-width: 560px;">Customers pick from these when booking. The first active service is used by default on the booking page.</p>
+
+    <form id="add-service-form" class="panel mt-24" style="display:flex; gap:16px; align-items:flex-end; flex-wrap: wrap;">
+      <div class="field" style="margin:0; flex:1; min-width: 160px;">
+        <label for="s-name">Service Name</label>
+        <input type="text" id="s-name" placeholder="e.g. Haircut" required />
+      </div>
+      <div class="field" style="margin:0; width: 140px;">
+        <label for="s-duration">Duration (min)</label>
+        <input type="number" id="s-duration" value="20" min="5" step="5" required />
+      </div>
+      <div class="field" style="margin:0; width: 140px;">
+        <label for="s-price">Price (₹)</label>
+        <input type="number" id="s-price" min="0" step="1" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Add Service</button>
+    </form>
+
+    <div id="service-list" class="grid mt-24"></div>
+  </main>
+
+  <footer class="site-footer">Siva Saloon · Vanduvancheri</footer>
+</div>
+
+<script>
+  const list = document.getElementById("service-list");
+
+  async function loadServices() {
+    list.innerHTML = `<p>Loading…</p>`;
+    const res = await fetch("/api/admin/services");
+    if (res.status === 401) return (window.location.href = "index.html");
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<p>Could not load services.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    if (!data.services.length) {
+      list.innerHTML = `<div class="build-stub">No services yet — add the first one above.</div>`;
+      return;
+    }
+    data.services.forEach((s) => {
+      const row = document.createElement("div");
+      row.className = "panel";
+      row.style = "display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;";
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:600;">${s.name}</div>
+          <div style="font-size:0.8rem; color: var(--paper-dim); margin-top:2px;">${s.duration_minutes} min · ₹${s.price}</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span class="badge ${s.is_active ? "confirmed" : "cancelled"}">${s.is_active ? "active" : "inactive"}</span>
+          <button class="btn btn-outline" data-toggle="${s.id}" data-active="${s.is_active}" style="padding:8px 14px; font-size:0.78rem;">
+            ${s.is_active ? "Deactivate" : "Activate"}
+          </button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    list.querySelectorAll("[data-toggle]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const isActive = btn.dataset.active === "true";
+        const res = await fetch("/api/admin/services", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ serviceId: btn.dataset.toggle, is_active: !isActive }),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Could not update service.");
+        loadServices();
+      });
+    });
+  }
+
+  document.getElementById("add-service-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      name: document.getElementById("s-name").value.trim(),
+      duration_minutes: Number(document.getElementById("s-duration").value),
+      price: Number(document.getElementById("s-price").value),
+    };
+    const res = await fetch("/api/admin/services", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || "Could not add service.");
+    document.getElementById("add-service-form").reset();
+    document.getElementById("s-duration").value = 20;
+    loadServices();
+  });
+
+  document.getElementById("signout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "index.html";
+  });
+
+  loadServices();
+</script>
+
+</body>
+</html>

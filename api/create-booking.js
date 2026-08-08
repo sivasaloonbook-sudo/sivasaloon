@@ -76,7 +76,14 @@ module.exports = async (req, res) => {
     })
     .select()
     .single();
-  if (bookErr) return res.status(500).json({ error: "Could not create booking." });
+  if (bookErr) {
+    // Postgres unique_violation — another request won the same slot in the
+    // gap between our pre-check above and this insert.
+    if (bookErr.code === "23505") {
+      return res.status(409).json({ error: "That slot was just booked. Pick another." });
+    }
+    return res.status(500).json({ error: "Could not create booking." });
+  }
 
   const invoiceNumber = `SS-${Date.now()}`;
   await supabaseAdmin.from("bills").insert({

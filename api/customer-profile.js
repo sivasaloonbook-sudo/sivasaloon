@@ -16,7 +16,23 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === "POST") {
-    const { name, email, address, mobile, profile_photo_url } = req.body || {};
+    let { name, email, address, mobile, profile_photo_url } = req.body || {};
+
+    // Strip any HTML tags and cap length on free-text fields — defense in
+    // depth against stored XSS, on top of front-end escaping on display.
+    const clean = (v, maxLen) =>
+      typeof v === "string" ? v.replace(/<[^>]*>/g, "").trim().slice(0, maxLen) : v;
+    name = clean(name, 100);
+    email = clean(email, 150);
+    address = clean(address, 300);
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Enter a valid email address." });
+    }
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      return res.status(400).json({ error: "Enter a valid 10-digit mobile number." });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("customers")
       .update({ name, email, address, mobile, profile_photo_url, updated_at: new Date().toISOString() })
